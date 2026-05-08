@@ -1,0 +1,120 @@
+
+Action: file_editor create /app/frontend/src/pages/Complaints.jsx --file-text "import React, { useState } from \"react\";
+import axios from \"axios\";
+import { useApp, API } from \"../AppContext\";
+import { Camera, Plus, X } from \"lucide-react\";
+
+export default function Complaints() {
+  const { city, complaints, refresh } = useApp();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ zone: \"\", place: \"\", area: \"\", description: \"\" });
+  const [photo, setPhoto] = useState(null); // base64 string
+  const [submitting, setSubmitting] = useState(false);
+
+  const onFile = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhoto(ev.target.result);
+    reader.readAsDataURL(f);
+  };
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      await axios.post(`${API}/complaints`, { city, ...form, photo_base64: photo });
+      setOpen(false);
+      setForm({ zone: \"\", place: \"\", area: \"\", description: \"\" });
+      setPhoto(null);
+      await refresh();
+    } catch (e) { alert(\"Failed to submit complaint\"); }
+    setSubmitting(false);
+  };
+
+  return (
+    <div className=\"space-y-6\">
+      <div className=\"flex items-end justify-between\">
+        <div>
+          <h1 className=\"text-3xl font-bold\">Complaints</h1>
+          <p className=\"text-slate-500 dark:text-slate-400\">Citizen-reported issues with photos.</p>
+        </div>
+        <button onClick={() => setOpen(true)} data-testid=\"add-complaint-btn\"
+                className=\"inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium\">
+          <Plus size={16} /> Add Complaint
+        </button>
+      </div>
+
+      <div className=\"grid md:grid-cols-2 gap-4\">
+        {complaints.length === 0 && <p className=\"text-slate-500 text-sm\">No complaints yet.</p>}
+        {complaints.map((c) => (
+          <div key={c.id} data-testid={`complaint-${c.id}`}
+               className=\"rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4\">
+            <div className=\"flex items-start justify-between gap-2\">
+              <div>
+                <div className=\"font-bold\">{c.zone}</div>
+                <div className=\"text-xs text-slate-500\">{c.place} · {c.area}</div>
+              </div>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full ${
+                c.status === \"Open\" ? \"bg-red-100 text-red-700\" :
+                c.status === \"In Progress\" ? \"bg-amber-100 text-amber-700\" :
+                \"bg-emerald-100 text-emerald-700\"
+              }`}>{c.status}</span>
+            </div>
+            <p className=\"text-sm mt-2\">{c.description}</p>
+            {c.photo_base64 && (
+              <img src={c.photo_base64} alt=\"complaint\" className=\"mt-3 rounded-lg max-h-40 object-cover w-full\" />
+            )}
+            <div className=\"text-[11px] text-slate-400 mt-2\">{new Date(c.created_at).toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+
+      {open && (
+        <div className=\"fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4\">
+          <div className=\"bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-lg\" data-testid=\"complaint-modal\">
+            <div className=\"flex items-center justify-between mb-4\">
+              <h3 className=\"font-bold text-lg\">Add Complaint</h3>
+              <button onClick={() => setOpen(false)}><X size={18} /></button>
+            </div>
+            <div className=\"space-y-3\">
+              <Field label=\"Zone\" v={form.zone} onChange={(v) => setForm({ ...form, zone: v })} testid=\"cf-zone\" />
+              <Field label=\"Place\" v={form.place} onChange={(v) => setForm({ ...form, place: v })} testid=\"cf-place\" />
+              <Field label=\"Area\" v={form.area} onChange={(v) => setForm({ ...form, area: v })} testid=\"cf-area\" />
+              <div>
+                <label className=\"text-xs text-slate-500\">Description</label>
+                <textarea rows={3} value={form.description}
+                  data-testid=\"cf-desc\"
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className=\"w-full mt-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-sm\" />
+              </div>
+              <div>
+                <label className=\"inline-flex items-center gap-2 cursor-pointer text-sm text-emerald-700\">
+                  <Camera size={16} /> Attach photo
+                  <input type=\"file\" accept=\"image/*\" onChange={onFile} data-testid=\"cf-photo\" className=\"hidden\" />
+                </label>
+                {photo && <img src={photo} alt=\"preview\" className=\"mt-2 rounded-lg max-h-40 object-cover w-full\" />}
+              </div>
+              <button
+                onClick={submit} disabled={submitting || !form.description}
+                data-testid=\"cf-submit\"
+                className=\"w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white py-2.5 rounded-lg font-medium\"
+              >
+                {submitting ? \"Submitting…\" : \"Submit Complaint\"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const Field = ({ label, v, onChange, testid }) => (
+  <div>
+    <label className=\"text-xs text-slate-500\">{label}</label>
+    <input value={v} data-testid={testid} onChange={(e) => onChange(e.target.value)}
+           className=\"w-full mt-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-sm\" />
+  </div>
+);
+"
+Observation: Create successful: /app/frontend/src/pages/Complaints.jsx

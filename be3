@@ -1,0 +1,6 @@
+
+Action: $ cd /app/backend && pip install httpx -q 2>&1 | tail -3 && sudo supervisorctl restart backend && sleep 4 && curl -s http://localhost:8001/api/cities | python3 -c "import sys,json; d=json.load(sys.stdin); print('cities:', len(d), [c['id'] for c in d])"
+Observation: backend: stopped
+backend: started
+cities: 2 ['bengaluru', 'mysore']
+Exit code: 0

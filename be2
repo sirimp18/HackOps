@@ -1,0 +1,383 @@
+
+Action: file_editor create /app/backend/server.py --file-text "from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+import os
+import logging
+from pathlib import Path
+from pydantic import BaseModel, Field
+from typing import List, Optional
+import uuid
+from datetime import datetime, timezone
+import asyncio
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+# MongoDB connection
+mongo_url = os.environ['MONGO_URL']
+client = AsyncIOMotorClient(mongo_url)
+db = client[os.environ['DB_NAME']]
+
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
+SENDGRID_FROM_EMAIL = os.environ.get('SENDGRID_FROM_EMAIL', '')
+
+app = FastAPI(title=\"CitiBin API\")
+api_router = APIRouter(prefix=\"/api\")
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(\"citibin\")
+
+
+# ============= Models =============
+class Bin(BaseModel):
+    id: str
+    city: str
+    area: str
+    place: str
+    lat: float
+    lng: float
+    fill_percent: int
+    capacity_liters: int
+    type: str
+    status: str
+    last_collected: Optional[str] = None
+
+
+class ComplaintCreate(BaseModel):
+    city: str
+    zone: str
+    place: str
+    area: str
+    description: str
+    photo_base64: Optional[str] = None  # data URL or base64
+
+
+class EventCreate(BaseModel):
+    city: str
+    name: str
+    date: str   # YYYY-MM-DD
+    time: str   # HH:MM
+    venue: str
+    expected_attendees: int
+    bins_needed: int
+    description: Optional[str] = \"\"
+
+
+class BinPlaceRequest(BaseModel):
+    city: str
+    lat: float
+    lng: float
+
+
+class AIReportRequest(BaseModel):
+    city: str
+    zone_id: Optional[str] = None
+    context: Optional[str] = \"\"
+
+
+class AIPlacementRequest(BaseModel):
+    city: str
+    lat: float
+    lng: float
+    nearby_bins: int = 0
+    foot_traffic: int = 50
+
+
+# ============= Seed bootstrap =============
+async def ensure_seeded():
+    \"\"\"Insert seed data once.\"\"\"
+    from seed_data import all_seed
+    seed = all_seed()
+    # cities
+    if await db.cities.count_documents({}) == 0:
+        await db.cities.insert_many(seed[\"cities\"])
+    if await db.bins.count_documents({}) == 0:
+        await db.bins.insert_many(seed[\"bins\"])
+    if await db.zones.count_documents({}) == 0:
+        await db.zones.insert_many(seed[\"zones\"])
+    if await db.workers.count_documents({}) == 0:
+        await db.workers.insert_many(seed[\"workers\"])
+    if await db.events.count_documents({}) == 0:
+        await db.events.insert_many(seed[\"events\"])
+    if await db.complaints.count_documents({}) == 0:
+        await db.complaints.insert_many(seed[\"complaints\"])
+    # generate alerts for any heavy bins
+    await refresh_alerts_for_heavy_bins()
+
+
+async def refresh_alerts_for_heavy_bins():
+    \"\"\"Create dashboard alerts + worker notifications for any bin in 'heavy' status with no open alert.\"\"\"
+    bins = await db.bins.find({\"status\": \"heavy\"}, {\"_id\": 0}).to_list(500)
+    for b in bins:
+        existing = await db.alerts.find_one({\"bin_id\": b[\"id\"], \"resolved\": False})
+        if existing:
+            continue
+        alert = {
+            \"id\": str(uuid.uuid4()),
+            \"bin_id\": b[\"id\"],
+            \"city\": b[\"city\"],
+            \"area\": b[\"area\"],
+            \"place\": b[\"place\"],
+            \"fill_percent\": b[\"fill_percent\"],
+            \"message\": f\"BIN {b['id']} at {b['place']} ({b['area']}) is {b['fill_percent']}% full — immediate attention needed.\",
+            \"severity\": \"high\",
+            \"resolved\": False,
+            \"created_at\": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.alerts.insert_one(alert)
+        # Notify nearest worker for that area/city
+        worker = await db.workers.find_one({\"city\": b[\"city\"]}, {\"_id\": 0})
+        if worker:
+            notif = {
+                \"id\": str(uuid.uuid4()),
+                \"worker_id\": worker[\"id\"],
+                \"worker_name\": worker[\"name\"],
+                \"worker_email\": worker[\"email\"],
+                \"worker_phone\": worker[\"phone\"],
+                \"bin_id\": b[\"id\"],
+                \"city\": b[\"city\"],
+                \"message\": f\"URGENT: Bin {b['id']} at {b['place']} is {b['fill_percent']}% full. Please collect ASAP.\",
+                \"channel\": \"email\",
+                \"delivered\": False,
+                \"created_at\": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.notifications.insert_one(notif)
+            # Attempt SendGrid (stubbed if no key)
+            await send_email_notification(notif)
+
+
+async def send_email_notification(notif: dict):
+    \"\"\"Send email via SendGrid if API key present, else log + mark stubbed.\"\"\"
+    if not SENDGRID_API_KEY:
+        logger.info(f\"[STUBBED EMAIL] To: {notif['worker_email']} | {notif['message']}\")
+        await db.notifications.update_one(
+            {\"id\": notif[\"id\"]},
+            {\"$set\": {\"delivered\": False, \"delivery_note\": \"STUBBED - SendGrid key not configured\"}}
+        )
+        return
+    try:
+        import httpx
+        payload = {
+            \"personalizations\": [{\"to\": [{\"email\": notif[\"worker_email\"]}]}],
+            \"from\": {\"email\": SENDGRID_FROM_EMAIL or \"alerts@citibin.app\"},
+            \"subject\": f\"[CitiBin Alert] Bin {notif['bin_id']} needs attention\",
+            \"content\": [{\"type\": \"text/plain\", \"value\": notif[\"message\"]}],
+        }
+        async with httpx.AsyncClient(timeout=10) as cli:
+            r = await cli.post(
+                \"https://api.sendgrid.com/v3/mail/send\",
+                headers={\"Authorization\": f\"Bearer {SENDGRID_API_KEY}\",
+                         \"Content-Type\": \"application/json\"},
+                json=payload,
+            )
+            ok = 200 <= r.status_code < 300
+            await db.notifications.update_one(
+                {\"id\": notif[\"id\"]},
+                {\"$set\": {\"delivered\": ok, \"delivery_note\": f\"SendGrid status {r.status_code}\"}}
+            )
+    except Exception as e:
+        logger.exception(\"SendGrid send failed\")
+        await db.notifications.update_one(
+            {\"id\": notif[\"id\"]},
+            {\"$set\": {\"delivered\": False, \"delivery_note\": f\"Error: {e}\"}}
+        )
+
+
+# ============= Routes =============
+@api_router.get(\"/\")
+async def root():
+    return {\"app\": \"CitiBin\", \"status\": \"ok\"}
+
+
+@api_router.get(\"/cities\")
+async def get_cities():
+    items = await db.cities.find({}, {\"_id\": 0}).to_list(50)
+    return items
+
+
+@api_router.get(\"/bins\")
+async def get_bins(city: str = Query(...)):
+    items = await db.bins.find({\"city\": city}, {\"_id\": 0}).to_list(500)
+    return items
+
+
+@api_router.get(\"/zones\")
+async def get_zones(city: str = Query(...)):
+    items = await db.zones.find({\"city\": city}, {\"_id\": 0}).to_list(200)
+    return items
+
+
+@api_router.get(\"/workers\")
+async def get_workers(city: str = Query(...)):
+    items = await db.workers.find({\"city\": city}, {\"_id\": 0}).to_list(200)
+    return items
+
+
+@api_router.get(\"/events\")
+async def get_events(city: str = Query(...)):
+    items = await db.events.find({\"city\": city}, {\"_id\": 0}).sort(\"date\", 1).to_list(200)
+    return items
+
+
+@api_router.post(\"/events\")
+async def create_event(payload: EventCreate):
+    doc = payload.model_dump()
+    doc[\"id\"] = f\"E-{payload.city[:3].upper()}-{str(uuid.uuid4())[:6]}\"
+    doc[\"status\"] = \"Upcoming\"
+    await db.events.insert_one(doc)
+    doc.pop(\"_id\", None)
+    return doc
+
+
+@api_router.get(\"/complaints\")
+async def get_complaints(city: str = Query(...)):
+    items = await db.complaints.find({\"city\": city}, {\"_id\": 0}).sort(\"created_at\", -1).to_list(500)
+    return items
+
+
+@api_router.post(\"/complaints\")
+async def create_complaint(payload: ComplaintCreate):
+    doc = payload.model_dump()
+    doc[\"id\"] = f\"C-{str(uuid.uuid4())[:8]}\"
+    doc[\"status\"] = \"Open\"
+    doc[\"created_at\"] = datetime.now(timezone.utc).isoformat()
+    await db.complaints.insert_one(doc)
+    doc.pop(\"_id\", None)
+    return doc
+
+
+@api_router.get(\"/alerts\")
+async def get_alerts(city: str = Query(...), resolved: bool = False):
+    items = await db.alerts.find({\"city\": city, \"resolved\": resolved}, {\"_id\": 0}).sort(\"created_at\", -1).to_list(500)
+    return items
+
+
+@api_router.post(\"/alerts/{alert_id}/resolve\")
+async def resolve_alert(alert_id: str):
+    res = await db.alerts.update_one({\"id\": alert_id}, {\"$set\": {\"resolved\": True}})
+    if res.matched_count == 0:
+        raise HTTPException(404, \"Alert not found\")
+    return {\"ok\": True}
+
+
+@api_router.get(\"/notifications\")
+async def get_notifications(city: str = Query(...)):
+    items = await db.notifications.find({\"city\": city}, {\"_id\": 0}).sort(\"created_at\", -1).to_list(500)
+    return items
+
+
+@api_router.get(\"/registry\")
+async def get_registry(city: str = Query(...)):
+    \"\"\"Bin registry — same as bins but optimized for table view.\"\"\"
+    items = await db.bins.find({\"city\": city}, {\"_id\": 0}).to_list(500)
+    return items
+
+
+@api_router.post(\"/simulation/place-bin\")
+async def simulate_place(payload: BinPlaceRequest):
+    \"\"\"For simulation: given a clicked map point, return area info + a synthetic bin.\"\"\"
+    # find closest seeded bin
+    bins = await db.bins.find({\"city\": payload.city}, {\"_id\": 0}).to_list(500)
+    if not bins:
+        raise HTTPException(404, \"City has no bins seeded\")
+    def dist(b):
+        return (b[\"lat\"] - payload.lat) ** 2 + (b[\"lng\"] - payload.lng) ** 2
+    nearest = min(bins, key=dist)
+    # Synthetic fill % based on a deterministic hash of lat/lng
+    import hashlib
+    h = int(hashlib.md5(f\"{payload.lat:.4f},{payload.lng:.4f}\".encode()).hexdigest(), 16)
+    fill = h % 101
+    status = \"heavy\" if fill >= 80 else (\"moderate\" if fill >= 50 else \"light\")
+    return {
+        \"lat\": payload.lat,
+        \"lng\": payload.lng,
+        \"area\": nearest[\"area\"],
+        \"place\": nearest[\"place\"],
+        \"city\": payload.city,
+        \"nearest_bin_id\": nearest[\"id\"],
+        \"capacity_liters\": 120,
+        \"fill_percent\": fill,
+        \"status\": status,  # heavy / moderate / light
+    }
+
+
+# ============= AI =============
+async def _llm_chat(system: str, user: str) -> str:
+    \"\"\"Run a single-turn Gemini 3 Flash call via emergentintegrations.\"\"\"
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    chat = (LlmChat(api_key=EMERGENT_LLM_KEY,
+                    session_id=f\"citibin-{uuid.uuid4()}\",
+                    system_message=system)
+            .with_model(\"gemini\", \"gemini-3-flash-preview\"))
+    return await chat.send_message(UserMessage(text=user))
+
+
+@api_router.post(\"/ai/generate-report\")
+async def ai_generate_report(req: AIReportRequest):
+    zone_str = \"\"
+    if req.zone_id:
+        z = await db.zones.find_one({\"id\": req.zone_id}, {\"_id\": 0})
+        if z:
+            zone_str = f\"Zone: {z['name']} (area: {z['area']}). Foot traffic: {z['foot_traffic']}/100. Commercial density: {z['commercial_density']}/100. Tags: {', '.join(z['tags'])}. Open complaints: {z['complaints_count']}.\"
+    system = (
+        \"You are CitiBin AI, an expert in urban smart-waste analytics for Indian cities \"
+        \"(Bengaluru and Mysore). Produce a crisp, structured operational report with \"
+        \"clear recommendations. Use markdown headings and bullet points.\"
+    )
+    user = (
+        f\"City: {req.city.title()}.\n\"
+        f\"{zone_str}\n\"
+        f\"Additional context: {req.context or 'general operations'}.\n\n\"
+        \"Generate: 1) Situation summary, 2) Top 3 risk hotspots, \"
+        \"3) Bin placement recommendations with rationale, 4) Operational actions \"
+        \"for the next 7 days, 5) KPIs to track.\"
+    )
+    text = await _llm_chat(system, user)
+    return {\"report\": text, \"model\": \"gemini-3-flash-preview\"}
+
+
+@api_router.post(\"/ai/evaluate-placement\")
+async def ai_evaluate_placement(req: AIPlacementRequest):
+    system = (
+        \"You are CitiBin AI, evaluating proposed smart-bin placements in Indian cities. \"
+        \"Be concise (max 250 words). Use markdown bullets.\"
+    )
+    user = (
+        f\"Evaluate placing a new smart bin in {req.city.title()} at \"
+        f\"({req.lat:.4f}, {req.lng:.4f}). Nearby existing bins: {req.nearby_bins}. \"
+        f\"Estimated foot traffic: {req.foot_traffic}/100. \"
+        \"Provide: verdict (RECOMMEND / RECONSIDER / REJECT), reasoning, expected utilization, \"
+        \"and any operational caveats.\"
+    )
+    text = await _llm_chat(system, user)
+    return {\"evaluation\": text, \"model\": \"gemini-3-flash-preview\"}
+
+
+# ============= Lifecycle =============
+@app.on_event(\"startup\")
+async def on_startup():
+    await ensure_seeded()
+    logger.info(\"CitiBin: seed data ensured.\")
+
+
+@app.on_event(\"shutdown\")
+async def on_shutdown():
+    client.close()
+
+
+app.include_router(api_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_methods=[\"*\"],
+    allow_headers=[\"*\"],
+)
+"
+Observation: Overwrite successful: /app/backend/server.py

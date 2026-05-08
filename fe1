@@ -1,0 +1,13 @@
+
+Action: $ cd /app/frontend && yarn add leaflet react-leaflet 2>&1 | tail -10
+Observation: warning Workspaces can only be enabled in private projects.
+success Saved 3 new dependencies.
+info Direct dependencies
+├─ leaflet@1.9.4
+└─ react-leaflet@5.0.0
+info All dependencies
+├─ @react-leaflet/core@3.0.0
+├─ leaflet@1.9.4
+└─ react-leaflet@5.0.0
+Done in 41.46s.
+Exit code: 0

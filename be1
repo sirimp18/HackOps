@@ -1,0 +1,225 @@
+Now let me build the backend with all routes and seed data:
+Action: file_editor create /app/backend/seed_data.py --file-text "\"\"\"Seed data for CitiBin: bins, zones, workers, events for Bengaluru & Mysore.\"\"\"
+from datetime import datetime, timezone, timedelta
+import uuid
+
+# City definitions with center coordinates
+CITIES = {
+    \"bengaluru\": {
+        \"id\": \"bengaluru\",
+        \"name\": \"Bengaluru\",
+        \"center\": [12.9716, 77.5946],
+        \"zoom\": 12,
+        \"agency\": \"BBMP (Bruhat Bengaluru Mahanagara Palike)\",
+    },
+    \"mysore\": {
+        \"id\": \"mysore\",
+        \"name\": \"Mysore\",
+        \"center\": [12.2958, 76.6394],
+        \"zoom\": 13,
+        \"agency\": \"MCC (Mysuru City Corporation)\",
+    },
+}
+
+
+def _bin(bid, city, area, place, lat, lng, fill, capacity=120, type_=\"General\"):
+    return {
+        \"id\": bid,
+        \"city\": city,
+        \"area\": area,
+        \"place\": place,
+        \"lat\": lat,
+        \"lng\": lng,
+        \"fill_percent\": fill,
+        \"capacity_liters\": capacity,
+        \"type\": type_,
+        \"status\": \"heavy\" if fill >= 80 else (\"moderate\" if fill >= 50 else \"light\"),
+        \"last_collected\": (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat(),
+    }
+
+
+BINS = [
+    # Bengaluru
+    _bin(\"BLR-001\", \"bengaluru\", \"MG Road\", \"Trinity Circle\", 12.9719, 77.6097, 92),
+    _bin(\"BLR-002\", \"bengaluru\", \"Indiranagar\", \"100 Feet Road\", 12.9784, 77.6408, 87),
+    _bin(\"BLR-003\", \"bengaluru\", \"Koramangala\", \"Forum Mall\", 12.9344, 77.6112, 78),
+    _bin(\"BLR-004\", \"bengaluru\", \"Whitefield\", \"Phoenix MarketCity\", 12.9959, 77.6960, 65),
+    _bin(\"BLR-005\", \"bengaluru\", \"HSR Layout\", \"Sector 1 Park\", 12.9116, 77.6473, 42),
+    _bin(\"BLR-006\", \"bengaluru\", \"Jayanagar\", \"4th Block Complex\", 12.9250, 77.5938, 71),
+    _bin(\"BLR-007\", \"bengaluru\", \"Malleshwaram\", \"Sampige Road\", 13.0034, 77.5687, 56),
+    _bin(\"BLR-008\", \"bengaluru\", \"BTM Layout\", \"Silk Board Junction\", 12.9165, 77.6101, 89),
+    _bin(\"BLR-009\", \"bengaluru\", \"Electronic City\", \"Phase 1 Hub\", 12.8452, 77.6602, 33),
+    _bin(\"BLR-010\", \"bengaluru\", \"Marathahalli\", \"Bridge Junction\", 12.9591, 77.6974, 81),
+    _bin(\"BLR-011\", \"bengaluru\", \"Banashankari\", \"BDA Complex\", 12.9250, 77.5469, 28),
+    _bin(\"BLR-012\", \"bengaluru\", \"Hebbal\", \"Hebbal Lake\", 13.0356, 77.5972, 47),
+    _bin(\"BLR-013\", \"bengaluru\", \"Yelahanka\", \"New Town Sq\", 13.1007, 77.5963, 19),
+    _bin(\"BLR-014\", \"bengaluru\", \"Brigade Road\", \"Plaza Junction\", 12.9716, 77.6068, 95),
+    # Mysore
+    _bin(\"MYS-001\", \"mysore\", \"Devaraja\", \"Devaraja Market\", 12.3079, 76.6552, 88),
+    _bin(\"MYS-002\", \"mysore\", \"Mysore Palace\", \"Palace North Gate\", 12.3051, 76.6552, 72),
+    _bin(\"MYS-003\", \"mysore\", \"Chamundi Hills\", \"Temple Foothill\", 12.2724, 76.6707, 54),
+    _bin(\"MYS-004\", \"mysore\", \"Kuvempunagar\", \"Double Road\", 12.3000, 76.6111, 38),
+    _bin(\"MYS-005\", \"mysore\", \"Vijayanagar\", \"Stage 2 Park\", 12.3242, 76.6168, 67),
+    _bin(\"MYS-006\", \"mysore\", \"Saraswathipuram\", \"DD Urs Road\", 12.3122, 76.6358, 91),
+    _bin(\"MYS-007\", \"mysore\", \"Gokulam\", \"3rd Stage Circle\", 12.3289, 76.6379, 23),
+    _bin(\"MYS-008\", \"mysore\", \"Lakshmipuram\", \"Bus Stand Square\", 12.3074, 76.6448, 76),
+    _bin(\"MYS-009\", \"mysore\", \"Hebbal\", \"Industrial Area\", 12.3500, 76.6000, 48),
+    _bin(\"MYS-010\", \"mysore\", \"Bogadi\", \"Ring Road Jn.\", 12.3179, 76.6024, 31),
+    _bin(\"MYS-011\", \"mysore\", \"Yadavagiri\", \"Hospital Road\", 12.3187, 76.6478, 84),
+]
+
+
+ZONES = [
+    # Bengaluru
+    {\"id\": \"Z-BLR-1\", \"city\": \"bengaluru\", \"name\": \"MG Road Commercial Belt\", \"area\": \"MG Road\",
+     \"foot_traffic\": 95, \"commercial_density\": 92, \"event_frequency\": \"High\",
+     \"tags\": [\"High pedestrian density\", \"Near food market\", \"Repeated overflow complaints\"],
+     \"complaints_count\": 12, \"waste_score\": 89},
+    {\"id\": \"Z-BLR-2\", \"city\": \"bengaluru\", \"name\": \"Indiranagar Nightlife Zone\", \"area\": \"Indiranagar\",
+     \"foot_traffic\": 88, \"commercial_density\": 90, \"event_frequency\": \"Very High\",
+     \"tags\": [\"Late-night activity\", \"Pubs & restaurants\", \"Tourist hotspot\"],
+     \"complaints_count\": 9, \"waste_score\": 84},
+    {\"id\": \"Z-BLR-3\", \"city\": \"bengaluru\", \"name\": \"Koramangala Tech Hub\", \"area\": \"Koramangala\",
+     \"foot_traffic\": 80, \"commercial_density\": 85, \"event_frequency\": \"Medium\",
+     \"tags\": [\"Office crowd\", \"Cafes cluster\", \"Long walking distance to nearest bin\"],
+     \"complaints_count\": 6, \"waste_score\": 76},
+    {\"id\": \"Z-BLR-4\", \"city\": \"bengaluru\", \"name\": \"Whitefield IT Corridor\", \"area\": \"Whitefield\",
+     \"foot_traffic\": 70, \"commercial_density\": 78, \"event_frequency\": \"Medium\",
+     \"tags\": [\"Mall-adjacent\", \"Tech park overflow\"],
+     \"complaints_count\": 4, \"waste_score\": 65},
+    {\"id\": \"Z-BLR-5\", \"city\": \"bengaluru\", \"name\": \"Brigade Road Shopping Strip\", \"area\": \"Brigade Road\",
+     \"foot_traffic\": 96, \"commercial_density\": 94, \"event_frequency\": \"High\",
+     \"tags\": [\"Heavy retail\", \"Tourist footfall\", \"Repeated overflow complaints\"],
+     \"complaints_count\": 15, \"waste_score\": 91},
+    # Mysore
+    {\"id\": \"Z-MYS-1\", \"city\": \"mysore\", \"name\": \"Devaraja Market Heritage Zone\", \"area\": \"Devaraja\",
+     \"foot_traffic\": 92, \"commercial_density\": 88, \"event_frequency\": \"High\",
+     \"tags\": [\"Wholesale market\", \"Flower market\", \"High pedestrian density\"],
+     \"complaints_count\": 11, \"waste_score\": 87},
+    {\"id\": \"Z-MYS-2\", \"city\": \"mysore\", \"name\": \"Mysore Palace Tourist Zone\", \"area\": \"Mysore Palace\",
+     \"foot_traffic\": 90, \"commercial_density\": 65, \"event_frequency\": \"Very High\",
+     \"tags\": [\"Tourist hotspot\", \"Dasara venue\", \"Photo crowds\"],
+     \"complaints_count\": 7, \"waste_score\": 79},
+    {\"id\": \"Z-MYS-3\", \"city\": \"mysore\", \"name\": \"Saraswathipuram Residential\", \"area\": \"Saraswathipuram\",
+     \"foot_traffic\": 60, \"commercial_density\": 55, \"event_frequency\": \"Low\",
+     \"tags\": [\"Residential\", \"School zone\", \"Repeated overflow complaints\"],
+     \"complaints_count\": 8, \"waste_score\": 70},
+    {\"id\": \"Z-MYS-4\", \"city\": \"mysore\", \"name\": \"Chamundi Hills Pilgrimage\", \"area\": \"Chamundi Hills\",
+     \"foot_traffic\": 75, \"commercial_density\": 35, \"event_frequency\": \"Medium\",
+     \"tags\": [\"Temple visitors\", \"Trekking trail\", \"Long walking distance to nearest bin\"],
+     \"complaints_count\": 5, \"waste_score\": 68},
+    {\"id\": \"Z-MYS-5\", \"city\": \"mysore\", \"name\": \"Gokulam Cafes & Yoga\", \"area\": \"Gokulam\",
+     \"foot_traffic\": 65, \"commercial_density\": 60, \"event_frequency\": \"Low\",
+     \"tags\": [\"Yoga schools\", \"Foreign tourists\", \"Cafe cluster\"],
+     \"complaints_count\": 3, \"waste_score\": 58},
+]
+
+
+WORKERS = [
+    # Bengaluru — BBMP and partner agencies
+    {\"id\": \"W-BLR-1\", \"city\": \"bengaluru\", \"name\": \"Ramesh Kumar\", \"role\": \"Field Supervisor\",
+     \"agency\": \"BBMP\", \"phone\": \"+91-98450-12345\", \"email\": \"ramesh.k@bbmp.gov.in\",
+     \"area\": \"MG Road / Brigade Road\", \"shift\": \"06:00 – 14:00\"},
+    {\"id\": \"W-BLR-2\", \"city\": \"bengaluru\", \"name\": \"Lakshmi Devi\", \"role\": \"Sanitation Worker\",
+     \"agency\": \"BBMP\", \"phone\": \"+91-98807-22344\", \"email\": \"lakshmi.d@bbmp.gov.in\",
+     \"area\": \"Indiranagar\", \"shift\": \"05:30 – 13:30\"},
+    {\"id\": \"W-BLR-3\", \"city\": \"bengaluru\", \"name\": \"Suresh Babu\", \"role\": \"Route Driver\",
+     \"agency\": \"BBMP Solid Waste Management\", \"phone\": \"+91-99860-44211\", \"email\": \"suresh.b@bbmpswm.in\",
+     \"area\": \"Koramangala / HSR\", \"shift\": \"07:00 – 15:00\"},
+    {\"id\": \"W-BLR-4\", \"city\": \"bengaluru\", \"name\": \"Anita Reddy\", \"role\": \"Zone Officer\",
+     \"agency\": \"BBMP\", \"phone\": \"+91-94483-99812\", \"email\": \"anita.r@bbmp.gov.in\",
+     \"area\": \"Whitefield / Marathahalli\", \"shift\": \"09:00 – 17:00\"},
+    {\"id\": \"W-BLR-5\", \"city\": \"bengaluru\", \"name\": \"Hasiru Dala Co-op\", \"role\": \"Recycling Partner\",
+     \"agency\": \"Hasiru Dala\", \"phone\": \"+91-80406-55400\", \"email\": \"support@hasirudala.in\",
+     \"area\": \"City-wide\", \"shift\": \"All day\"},
+    {\"id\": \"W-BLR-6\", \"city\": \"bengaluru\", \"name\": \"Mohammed Iqbal\", \"role\": \"Sanitation Worker\",
+     \"agency\": \"BBMP\", \"phone\": \"+91-97412-88300\", \"email\": \"iqbal.m@bbmp.gov.in\",
+     \"area\": \"Jayanagar / BTM\", \"shift\": \"06:00 – 14:00\"},
+    # Mysore — MCC and partners
+    {\"id\": \"W-MYS-1\", \"city\": \"mysore\", \"name\": \"Mahadevamma S.\", \"role\": \"Field Supervisor\",
+     \"agency\": \"MCC\", \"phone\": \"+91-94808-71203\", \"email\": \"mahadevamma@mcc.gov.in\",
+     \"area\": \"Devaraja Market\", \"shift\": \"05:30 – 13:30\"},
+    {\"id\": \"W-MYS-2\", \"city\": \"mysore\", \"name\": \"Krishnegowda\", \"role\": \"Route Driver\",
+     \"agency\": \"MCC\", \"phone\": \"+91-99024-12300\", \"email\": \"krishne.g@mcc.gov.in\",
+     \"area\": \"Palace / Lakshmipuram\", \"shift\": \"06:00 – 14:00\"},
+    {\"id\": \"W-MYS-3\", \"city\": \"mysore\", \"name\": \"Shobha Rani\", \"role\": \"Sanitation Worker\",
+     \"agency\": \"MCC\", \"phone\": \"+91-90360-55411\", \"email\": \"shobha.r@mcc.gov.in\",
+     \"area\": \"Saraswathipuram\", \"shift\": \"06:00 – 14:00\"},
+    {\"id\": \"W-MYS-4\", \"city\": \"mysore\", \"name\": \"Nataraj M.\", \"role\": \"Zone Officer\",
+     \"agency\": \"MCC\", \"phone\": \"+91-94491-22087\", \"email\": \"nataraj.m@mcc.gov.in\",
+     \"area\": \"Gokulam / Vijayanagar\", \"shift\": \"09:00 – 17:00\"},
+    {\"id\": \"W-MYS-5\", \"city\": \"mysore\", \"name\": \"Swacha Mysuru NGO\", \"role\": \"Recycling Partner\",
+     \"agency\": \"Swacha Mysuru\", \"phone\": \"+91-82172-90100\", \"email\": \"info@swachamysuru.org\",
+     \"area\": \"City-wide\", \"shift\": \"All day\"},
+]
+
+
+EVENTS = [
+    # Bengaluru
+    {\"id\": \"E-BLR-1\", \"city\": \"bengaluru\", \"name\": \"Bengaluru Tech Summit\",
+     \"date\": \"2026-02-18\", \"time\": \"09:00\", \"venue\": \"Palace Grounds\",
+     \"expected_attendees\": 35000, \"bins_needed\": 120, \"status\": \"Upcoming\",
+     \"description\": \"India's largest tech conference; major waste surge expected.\"},
+    {\"id\": \"E-BLR-2\", \"city\": \"bengaluru\", \"name\": \"IPL Match — RCB vs CSK\",
+     \"date\": \"2026-04-12\", \"time\": \"19:30\", \"venue\": \"M. Chinnaswamy Stadium\",
+     \"expected_attendees\": 40000, \"bins_needed\": 150, \"status\": \"Upcoming\",
+     \"description\": \"Cricket match with high beverage and food waste output.\"},
+    {\"id\": \"E-BLR-3\", \"city\": \"bengaluru\", \"name\": \"Karaga Festival\",
+     \"date\": \"2026-04-22\", \"time\": \"06:00\", \"venue\": \"Dharmaraya Swamy Temple\",
+     \"expected_attendees\": 200000, \"bins_needed\": 280, \"status\": \"Upcoming\",
+     \"description\": \"Traditional Bengaluru festival with city-wide processions.\"},
+    {\"id\": \"E-BLR-4\", \"city\": \"bengaluru\", \"name\": \"Bengaluru Marathon\",
+     \"date\": \"2026-10-19\", \"time\": \"05:30\", \"venue\": \"Kanteerava Stadium\",
+     \"expected_attendees\": 25000, \"bins_needed\": 200, \"status\": \"Upcoming\",
+     \"description\": \"Annual marathon along MG Road and Cubbon Park routes.\"},
+    # Mysore
+    {\"id\": \"E-MYS-1\", \"city\": \"mysore\", \"name\": \"Mysuru Dasara\",
+     \"date\": \"2026-09-22\", \"time\": \"16:00\", \"venue\": \"Mysore Palace & City\",
+     \"expected_attendees\": 500000, \"bins_needed\": 600, \"status\": \"Upcoming\",
+     \"description\": \"10-day grand festival; massive footfall across the city.\"},
+    {\"id\": \"E-MYS-2\", \"city\": \"mysore\", \"name\": \"Mysuru Yoga Day\",
+     \"date\": \"2026-06-21\", \"time\": \"06:00\", \"venue\": \"Mysore Palace Grounds\",
+     \"expected_attendees\": 15000, \"bins_needed\": 80, \"status\": \"Upcoming\",
+     \"description\": \"International Yoga Day mass gathering.\"},
+    {\"id\": \"E-MYS-3\", \"city\": \"mysore\", \"name\": \"Chamundi Hills Pilgrimage Day\",
+     \"date\": \"2026-10-03\", \"time\": \"04:00\", \"venue\": \"Chamundi Hills Temple\",
+     \"expected_attendees\": 80000, \"bins_needed\": 120, \"status\": \"Upcoming\",
+     \"description\": \"Annual peak pilgrimage day.\"},
+    {\"id\": \"E-MYS-4\", \"city\": \"mysore\", \"name\": \"Mysuru Food Festival\",
+     \"date\": \"2026-11-15\", \"time\": \"11:00\", \"venue\": \"Kalamandira Grounds\",
+     \"expected_attendees\": 12000, \"bins_needed\": 90, \"status\": \"Upcoming\",
+     \"description\": \"Traditional Mysore cuisine festival.\"},
+]
+
+
+COMPLAINTS = [
+    {\"id\": \"C-1\", \"city\": \"bengaluru\", \"zone\": \"MG Road\", \"place\": \"Trinity Circle\",
+     \"area\": \"MG Road\", \"description\": \"Bin overflowing for 3 days, foul smell.\",
+     \"photo_base64\": None, \"status\": \"Open\",
+     \"created_at\": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()},
+    {\"id\": \"C-2\", \"city\": \"bengaluru\", \"zone\": \"Indiranagar\", \"place\": \"100 Feet Road\",
+     \"area\": \"Indiranagar\", \"description\": \"Pub area waste not collected after weekend.\",
+     \"photo_base64\": None, \"status\": \"In Progress\",
+     \"created_at\": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()},
+    {\"id\": \"C-3\", \"city\": \"mysore\", \"zone\": \"Devaraja Market\", \"place\": \"Flower Section\",
+     \"area\": \"Devaraja\", \"description\": \"Wet waste pile near vendors.\",
+     \"photo_base64\": None, \"status\": \"Open\",
+     \"created_at\": (datetime.now(timezone.utc) - timedelta(hours=10)).isoformat()},
+    {\"id\": \"C-4\", \"city\": \"mysore\", \"zone\": \"Saraswathipuram\", \"place\": \"DD Urs Road\",
+     \"area\": \"Saraswathipuram\", \"description\": \"Bin missing — replacement needed.\",
+     \"photo_base64\": None, \"status\": \"Resolved\",
+     \"created_at\": (datetime.now(timezone.utc) - timedelta(days=4)).isoformat()},
+]
+
+
+def all_seed():
+    return {
+        \"cities\": list(CITIES.values()),
+        \"bins\": BINS,
+        \"zones\": ZONES,
+        \"workers\": WORKERS,
+        \"events\": EVENTS,
+        \"complaints\": COMPLAINTS,
+    }
+"
+Observation: Create successful: /app/backend/seed_data.py

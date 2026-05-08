@@ -1,0 +1,45 @@
+Now wire it all up in App.js and update CSS:
+Action: file_editor create /app/frontend/src/App.js --file-text "import React from \"react\";
+import \"./App.css\";
+import { BrowserRouter, Routes, Route } from \"react-router-dom\";
+import { AppProvider } from \"./AppContext\";
+import Layout from \"./components/Layout\";
+import Landing from \"./pages/Landing\";
+import Dashboard from \"./pages/Dashboard\";
+import Analytics from \"./pages/Analytics\";
+import Simulation from \"./pages/Simulation\";
+import AIRecs from \"./pages/AIRecs\";
+import Zones from \"./pages/Zones\";
+import Complaints from \"./pages/Complaints\";
+import Events from \"./pages/Events\";
+import Registry from \"./pages/Registry\";
+import Workers from \"./pages/Workers\";
+
+const Wrapped = (Comp) => (
+  <Layout><Comp /></Layout>
+);
+
+function App() {
+  return (
+    <AppProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path=\"/\" element={<Landing />} />
+          <Route path=\"/dashboard\" element={Wrapped(Dashboard)} />
+          <Route path=\"/analytics\" element={Wrapped(Analytics)} />
+          <Route path=\"/simulation\" element={Wrapped(Simulation)} />
+          <Route path=\"/ai-recs\" element={Wrapped(AIRecs)} />
+          <Route path=\"/zones\" element={Wrapped(Zones)} />
+          <Route path=\"/complaints\" element={Wrapped(Complaints)} />
+          <Route path=\"/events\" element={Wrapped(Events)} />
+          <Route path=\"/registry\" element={Wrapped(Registry)} />
+          <Route path=\"/workers\" element={Wrapped(Workers)} />
+        </Routes>
+      </BrowserRouter>
+    </AppProvider>
+  );
+}
+
+export default App;
+"
+Observation: Overwrite successful: /app/frontend/src/App.js

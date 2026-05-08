@@ -1,0 +1,130 @@
+
+Action: file_editor create /app/frontend/src/pages/Simulation.jsx --file-text "import React, { useState } from \"react\";
+import axios from \"axios\";
+import { useApp } from \"../AppContext\";
+import MapView, { fillColor } from \"../components/MapView\";
+import { API } from \"../AppContext\";
+import { Sparkles } from \"lucide-react\";
+
+export default function Simulation() {
+  const { city, cities, bins } = useApp();
+  const cityObj = cities.find((c) => c.id === city);
+  const [placed, setPlaced] = useState([]);  // [{lat,lng,...}]
+  const [aiOutput, setAiOutput] = useState(\"\");
+  const [loading, setLoading] = useState(false);
+  const [selectedSim, setSelectedSim] = useState(null);
+
+  const handleClick = async (latlng) => {
+    try {
+      const r = await axios.post(`${API}/simulation/place-bin`, {
+        city, lat: latlng.lat, lng: latlng.lng,
+      });
+      setPlaced((prev) => [...prev, r.data]);
+      setSelectedSim(r.data);
+    } catch (e) { console.error(e); }
+  };
+
+  const runEval = async () => {
+    if (!selectedSim) return;
+    setLoading(true);
+    setAiOutput(\"\");
+    try {
+      const r = await axios.post(`${API}/ai/evaluate-placement`, {
+        city, lat: selectedSim.lat, lng: selectedSim.lng,
+        nearby_bins: 1, foot_traffic: 70,
+      });
+      setAiOutput(r.data.evaluation);
+    } catch (e) {
+      setAiOutput(\"AI evaluation failed. Please try again.\");
+    }
+    setLoading(false);
+  };
+
+  // Combine seeded + simulated markers
+  const markers = [
+    ...bins.map((b) => ({
+      lat: b.lat, lng: b.lng,
+      color: fillColor(b.fill_percent),
+      popup: `<b>${b.id}</b> · ${b.place}<br/>${b.fill_percent}% fill`,
+    })),
+    ...placed.map((p, i) => ({
+      lat: p.lat, lng: p.lng,
+      color: \"#3b82f6\",
+      popup: `<b>SIM-${i + 1}</b> · ${p.place}<br/>${p.fill_percent}% (simulated)`,
+      onClick: () => setSelectedSim(p),
+    })),
+  ];
+
+  return (
+    <div className=\"space-y-6\">
+      <div>
+        <h1 className=\"text-3xl font-bold\">Simulation</h1>
+        <p className=\"text-slate-500 dark:text-slate-400\">
+          Click anywhere on the {cityObj?.name} map to place a virtual bin and see area details.
+        </p>
+      </div>
+      <div className=\"grid lg:grid-cols-3 gap-4\">
+        <div className=\"lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4\">
+          <MapView
+            center={cityObj?.center || [12.97, 77.59]}
+            zoom={cityObj?.zoom || 12}
+            markers={markers}
+            onMapClick={handleClick}
+            height={520}
+          />
+          <p className=\"text-xs text-slate-500 mt-2\">
+            Tip: clicking the map runs an instant area lookup. Existing bins are red/amber/green by fill;
+            simulated bins are blue.
+          </p>
+        </div>
+
+        <div className=\"rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4\">
+          <div>
+            <h3 className=\"font-semibold\">Last Click Result</h3>
+            {!selectedSim ? (
+              <p className=\"text-sm text-slate-500 mt-2\">Click the map to populate this panel.</p>
+            ) : (
+              <div data-testid=\"sim-result\" className=\"mt-3 space-y-2 text-sm\">
+                <Row k=\"Area\" v={selectedSim.area} />
+                <Row k=\"Place\" v={selectedSim.place} />
+                <Row k=\"Coords\" v={`${selectedSim.lat.toFixed(4)}, ${selectedSim.lng.toFixed(4)}`} />
+                <Row k=\"Capacity\" v={`${selectedSim.capacity_liters} L`} />
+                <Row k=\"Fill %\" v={
+                  <span className=\"font-bold\" style={{ color: fillColor(selectedSim.fill_percent) }}>
+                    {selectedSim.fill_percent}%
+                  </span>} />
+                <Row k=\"State\" v={
+                  <span className=\"px-2 py-0.5 rounded text-xs text-white\"
+                        style={{ background: fillColor(selectedSim.fill_percent) }}>
+                    {selectedSim.status === \"heavy\" ? \"HEAVY\" : selectedSim.status === \"moderate\" ? \"MODERATE\" : \"LIGHT\"}
+                  </span>
+                } />
+              </div>
+            )}
+          </div>
+          <button
+            disabled={!selectedSim || loading}
+            onClick={runEval}
+            data-testid=\"run-ai-eval-btn\"
+            className=\"w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-2.5 font-semibold transition\"
+          >
+            <Sparkles size={16} /> {loading ? \"Evaluating…\" : \"Run AI Evaluation\"}
+          </button>
+          {aiOutput && (
+            <div data-testid=\"ai-eval-output\" className=\"text-sm whitespace-pre-wrap bg-slate-50 dark:bg-slate-800 rounded-lg p-3 max-h-72 overflow-auto\">
+              {aiOutput}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const Row = ({ k, v }) => (
+  <div className=\"flex justify-between gap-2\">
+    <span className=\"text-slate-500\">{k}</span><span className=\"font-medium text-right\">{v}</span>
+  </div>
+);
+"
+Observation: Create successful: /app/frontend/src/pages/Simulation.jsx

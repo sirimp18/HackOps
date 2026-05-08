@@ -1,0 +1,11 @@
+
+Action: file_editor create /app/frontend/src/App.css --file-text ".App { min-height: 100vh; }
+
+/* Leaflet popup tweaks */
+.leaflet-popup-content { font-size: 13px; }
+.leaflet-container { font-family: inherit; }
+
+/* Hide attribution clutter on small */
+.leaflet-bottom.leaflet-right { font-size: 10px; }
+"
+Observation: Overwrite successful: /app/frontend/src/App.css

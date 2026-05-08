@@ -1,0 +1,80 @@
+AI works. Now let me build the React frontend. I'll create the layout, all pages, and the styling:
+Action: file_editor create /app/frontend/src/AppContext.js --file-text "import React, { createContext, useContext, useEffect, useState, useCallback } from \"react\";
+import axios from \"axios\";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+export const API = `${BACKEND_URL}/api`;
+
+const AppCtx = createContext(null);
+export const useApp = () => useContext(AppCtx);
+
+export const AppProvider = ({ children }) => {
+  const [city, setCity] = useState(\"bengaluru\");
+  const [theme, setThemeState] = useState(
+    () => localStorage.getItem(\"citibin_theme\") || \"light\"
+  );
+
+  const setTheme = (t) => {
+    setThemeState(t);
+    localStorage.setItem(\"citibin_theme\", t);
+    if (t === \"dark\") document.documentElement.classList.add(\"dark\");
+    else document.documentElement.classList.remove(\"dark\");
+  };
+
+  useEffect(() => {
+    setTheme(theme);
+    // eslint-disable-next-line
+  }, []);
+
+  const [cities, setCities] = useState([]);
+  const [bins, setBins] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [workers, setWorkers] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [complaints, setComplaints] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [c, b, z, w, e, co, al, nt] = await Promise.all([
+        axios.get(`${API}/cities`),
+        axios.get(`${API}/bins?city=${city}`),
+        axios.get(`${API}/zones?city=${city}`),
+        axios.get(`${API}/workers?city=${city}`),
+        axios.get(`${API}/events?city=${city}`),
+        axios.get(`${API}/complaints?city=${city}`),
+        axios.get(`${API}/alerts?city=${city}`),
+        axios.get(`${API}/notifications?city=${city}`),
+      ]);
+      setCities(c.data);
+      setBins(b.data);
+      setZones(z.data);
+      setWorkers(w.data);
+      setEvents(e.data);
+      setComplaints(co.data);
+      setAlerts(al.data);
+      setNotifications(nt.data);
+    } catch (err) {
+      console.error(\"refresh failed\", err);
+    }
+  }, [city]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return (
+    <AppCtx.Provider
+      value={{
+        city, setCity, theme, setTheme, cities,
+        bins, zones, workers, events, complaints, alerts, notifications,
+        refresh,
+      }}
+    >
+      {children}
+    </AppCtx.Provider>
+  );
+};
+"
+Observation: Create successful: /app/frontend/src/AppContext.js

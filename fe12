@@ -1,0 +1,112 @@
+
+Action: file_editor create /app/frontend/src/pages/Events.jsx --file-text "import React, { useState } from \"react\";
+import axios from \"axios\";
+import { useApp, API } from \"../AppContext\";
+import { CalendarDays, Users, Trash2, Plus, X, MapPin, Clock } from \"lucide-react\";
+
+export default function Events() {
+  const { city, events, refresh } = useApp();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: \"\", date: \"\", time: \"\", venue: \"\", expected_attendees: 1000, bins_needed: 20, description: \"\",
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      await axios.post(`${API}/events`, {
+        city, ...form,
+        expected_attendees: parseInt(form.expected_attendees),
+        bins_needed: parseInt(form.bins_needed),
+      });
+      setOpen(false);
+      setForm({ name: \"\", date: \"\", time: \"\", venue: \"\", expected_attendees: 1000, bins_needed: 20, description: \"\" });
+      await refresh();
+    } catch (e) { alert(\"Failed to add event\"); }
+    setSubmitting(false);
+  };
+
+  return (
+    <div className=\"space-y-6\">
+      <div className=\"flex items-end justify-between flex-wrap gap-3\">
+        <div>
+          <h1 className=\"text-3xl font-bold\">Events</h1>
+          <p className=\"text-slate-500 dark:text-slate-400\">
+            Plan ahead for festivals, matches, and gatherings.
+          </p>
+        </div>
+        <button onClick={() => setOpen(true)} data-testid=\"add-event-btn\"
+                className=\"inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium\">
+          <Plus size={16} /> Add Event
+        </button>
+      </div>
+
+      <div className=\"grid md:grid-cols-2 gap-4\">
+        {events.map((e) => (
+          <div key={e.id} data-testid={`event-${e.id}`}
+               className=\"rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 hover:border-emerald-400 transition\">
+            <div className=\"flex items-start justify-between gap-2\">
+              <h3 className=\"font-bold text-lg\">{e.name}</h3>
+              <span className=\"text-[11px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold\">
+                {e.status}
+              </span>
+            </div>
+            <div className=\"text-sm text-slate-600 dark:text-slate-400 mt-3 space-y-1\">
+              <div className=\"flex items-center gap-2\"><CalendarDays size={14} className=\"text-emerald-600\" /> {e.date} <Clock size={14} className=\"text-emerald-600\" /> {e.time}</div>
+              <div className=\"flex items-center gap-2\"><MapPin size={14} className=\"text-emerald-600\" /> {e.venue}</div>
+              <div className=\"flex items-center gap-2\"><Users size={14} className=\"text-emerald-600\" /> {e.expected_attendees.toLocaleString()} expected</div>
+              <div className=\"flex items-center gap-2\"><Trash2 size={14} className=\"text-emerald-600\" /> {e.bins_needed} bins needed</div>
+            </div>
+            {e.description && <p className=\"text-xs text-slate-500 mt-3\">{e.description}</p>}
+          </div>
+        ))}
+      </div>
+
+      {open && (
+        <div className=\"fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4\">
+          <div className=\"bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-xl\" data-testid=\"event-modal\">
+            <div className=\"flex items-center justify-between mb-4\">
+              <h3 className=\"font-bold text-lg\">Add Upcoming Event</h3>
+              <button onClick={() => setOpen(false)}><X size={18} /></button>
+            </div>
+            <div className=\"grid sm:grid-cols-2 gap-3\">
+              <Field label=\"Name\" v={form.name} onChange={(v) => setForm({ ...form, name: v })} testid=\"ev-name\" />
+              <Field label=\"Venue\" v={form.venue} onChange={(v) => setForm({ ...form, venue: v })} testid=\"ev-venue\" />
+              <Field label=\"Date\" type=\"date\" v={form.date} onChange={(v) => setForm({ ...form, date: v })} testid=\"ev-date\" />
+              <Field label=\"Time\" type=\"time\" v={form.time} onChange={(v) => setForm({ ...form, time: v })} testid=\"ev-time\" />
+              <Field label=\"Expected Attendees\" type=\"number\" v={form.expected_attendees}
+                     onChange={(v) => setForm({ ...form, expected_attendees: v })} testid=\"ev-attendees\" />
+              <Field label=\"Bins Needed\" type=\"number\" v={form.bins_needed}
+                     onChange={(v) => setForm({ ...form, bins_needed: v })} testid=\"ev-bins\" />
+              <div className=\"sm:col-span-2\">
+                <label className=\"text-xs text-slate-500\">Description</label>
+                <textarea rows={2} value={form.description}
+                          data-testid=\"ev-desc\"
+                          onChange={(e) => setForm({ ...form, description: e.target.value })}
+                          className=\"w-full mt-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-sm\" />
+              </div>
+            </div>
+            <button
+              onClick={submit} disabled={submitting || !form.name || !form.date}
+              data-testid=\"ev-submit\"
+              className=\"w-full mt-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white py-2.5 rounded-lg font-medium\"
+            >
+              {submitting ? \"Saving…\" : \"Save Event\"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const Field = ({ label, v, onChange, testid, type = \"text\" }) => (
+  <div>
+    <label className=\"text-xs text-slate-500\">{label}</label>
+    <input type={type} value={v} data-testid={testid} onChange={(e) => onChange(e.target.value)}
+           className=\"w-full mt-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2 text-sm\" />
+  </div>
+);
+"
+Observation: Create successful: /app/frontend/src/pages/Events.jsx

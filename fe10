@@ -1,0 +1,58 @@
+
+Action: file_editor create /app/frontend/src/pages/Zones.jsx --file-text "import React from \"react\";
+import { useApp } from \"../AppContext\";
+import { MapPin, Activity, AlertTriangle } from \"lucide-react\";
+
+export default function Zones() {
+  const { zones } = useApp();
+  return (
+    <div className=\"space-y-6\">
+      <div>
+        <h1 className=\"text-3xl font-bold\">Zones</h1>
+        <p className=\"text-slate-500 dark:text-slate-400\">High-impact zones across the city.</p>
+      </div>
+      <div className=\"grid md:grid-cols-2 gap-4\">
+        {zones.map((z) => (
+          <div key={z.id} data-testid={`zone-${z.id}`}
+               className=\"rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 hover:border-emerald-400 transition\">
+            <div className=\"flex items-start justify-between gap-3\">
+              <div>
+                <h3 className=\"font-bold text-lg flex items-center gap-2\">
+                  <MapPin size={16} className=\"text-emerald-600\" /> {z.name}
+                </h3>
+                <p className=\"text-xs text-slate-500\">{z.area}</p>
+              </div>
+              <span className=\"text-xs font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 px-2 py-1 rounded\">
+                {z.event_frequency}
+              </span>
+            </div>
+            <div className=\"grid grid-cols-3 gap-2 mt-4 text-center\">
+              <Stat n={z.foot_traffic} l=\"Foot Traffic\" />
+              <Stat n={z.commercial_density} l=\"Commercial\" />
+              <Stat n={z.waste_score} l=\"Waste Score\" color=\"red\" />
+            </div>
+            <div className=\"flex flex-wrap gap-1.5 mt-4\">
+              {z.tags.map((t, i) => (
+                <span key={i} className=\"text-[11px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full\">
+                  {t}
+                </span>
+              ))}
+            </div>
+            <div className=\"mt-3 text-sm text-red-600 flex items-center gap-1.5\">
+              <AlertTriangle size={14} /> {z.complaints_count} open complaints
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const Stat = ({ n, l, color = \"emerald\" }) => (
+  <div>
+    <div className={`text-xl font-bold ${color === \"red\" ? \"text-red-600\" : \"text-emerald-600\"}`}>{n}</div>
+    <div className=\"text-[11px] text-slate-500\">{l}</div>
+  </div>
+);
+"
+Observation: Create successful: /app/frontend/src/pages/Zones.jsx

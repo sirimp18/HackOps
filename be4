@@ -1,0 +1,12 @@
+
+Action: $ curl -s -X POST http://localhost:8001/api/simulation/place-bin -H "Content-Type: application/json" -d '{"city":"bengaluru","lat":12.97,"lng":77.59}' && echo "" && \
+curl -s -X POST http://localhost:8001/api/ai/evaluate-placement -H "Content-Type: application/json" -d '{"city":"bengaluru","lat":12.97,"lng":77.59,"nearby_bins":2,"foot_traffic":85}' | python3 -c "import sys,json; d=json.load(sys.stdin); print('AI ok, len:', len(d.get('evaluation',''))); print(d.get('evaluation','')[:300])"
+Observation: {"lat":12.97,"lng":77.59,"area":"Brigade Road","place":"Plaza Junction","city":"bengaluru","nearest_bin_id":"BLR-014","capacity_liters":120,"fill_percent":88,"status":"heavy"}
+AI ok, len: 1541
+### **Evaluation Report: CitiBin Bengaluru-1297**
+
+**Verdict:** **RECOMMEND**
+
+**Reasoning:**
+*   **Prime Location:** The coordinates (12.9700, 77.5900) place the bin in the heart of **Sampangi Rama Nagar/St. Marks Road**, a high-density commercial and administrative hub near Cubbon Park and MG Road
+Exit code: 0
